@@ -1,4 +1,4 @@
-package com.raphtory.examples.wordSemantic.graphbuilders
+package examples.wordSemantic.graphbuilders
 
 import com.raphtory.core.actors.Router.GraphBuilder
 import com.raphtory.core.model.communication._
@@ -15,11 +15,13 @@ class CooccurrenceMatrixGraphBuilderFiltered extends GraphBuilder[String] {
       dp = dp.last.split("\t")
       val srcClusterId = assignID(dp.head)
       val len = dp.length
+      sendUpdate(VertexAddWithProperties(msgTime = occurenceTime, srcID = srcClusterId, Properties(StringProperty("Word", dp.head))))
       for (i <- 1 until len by 2) {
         if ((dp(i+1).toLong/scale) >= THR) {
           val dstClusterId = assignID(dp(i))
           val coocWeight = dp(i + 1).toLong
 
+          sendUpdate(VertexAddWithProperties(msgTime = occurenceTime, srcID = dstClusterId, Properties(StringProperty("Word", dp(i)))))
           sendUpdate(
             EdgeAddWithProperties(
               msgTime = occurenceTime,

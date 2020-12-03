@@ -1,126 +1,120 @@
-//package com.raphtory.examples.wordSemantic.spouts
-//
-//
-//import java.io.{BufferedReader, File, FileReader}
-//import java.time.LocalDateTime
-//
-//import com.raphtory.core.components.Spout.Spout
-//import com.raphtory.core.components.Spout.Spout.{BasicDomain, DomainMessage}
-//import com.raphtory.core.model.communication.StringSpoutGoing
-//import com.raphtory.examples.wordSemantic.spouts.CooccurrenceMatrixSpout.Message.{CooccuranceDomain, NextFile, NextLineBlock, NextLineSlice}
-//
-//import scala.concurrent.duration._
-//import scala.language.postfixOps
-//
-//class CooccurrenceMatrixSpout extends Spout[CooccuranceDomain,StringSpoutGoing] {
-//
-//  println("Start: " + LocalDateTime.now())
-//  val directory = System.getenv().getOrDefault("FILE_SPOUT_DIRECTORY", "/app").trim
-//  val fileName = System.getenv().getOrDefault("FILE_SPOUT_FILENAME", "").trim //gabNetwork500.csv
-//  val dropHeader = System.getenv().getOrDefault("FILE_SPOUT_DROP_HEADER", "false").trim.toBoolean
-//  var JUMP = System.getenv().getOrDefault("FILE_SPOUT_BLOCK_SIZE", "100").trim.toInt
-//  var INCREMENT = System.getenv().getOrDefault("FILE_SPOUT_INCREMENT", "1").trim.toInt
-//  var TIME = System.getenv().getOrDefault("FILE_SPOUT_TIME", "60").trim.toInt
-//
-//  var directoryPosition    = 0
-//
-//  val filesToRead = if(fileName.isEmpty)
-//    getListOfFiles(directory)
-//  else
-//    Array(directory + "/" + fileName)
-//
-//  var currentFile = fileToArray(directoryPosition)
-//  val JUMP2 = 20
-//  var posSlice = 1
-//  var cline = currentFile.readLine()
-//  var currentLine = cline.split("\t")
-//  var filename = filesToRead(directoryPosition) //D-200001_merge_occ
-//  var time = filename.split('/').last.stripPrefix("D-").stripSuffix("_merge_occ").toLong * 1000000000L
-//  var cnt = time + 1
-//
-//
-//
-//  def handleDomainMessage(message: CooccuranceDomain): Unit = message match {
-//
-//  case NextLineSlice => nextLineSlice()
-//  case NextLineBlock => nextLineBlock()
-//  case NextFile => nextFile()
-//  case _ => println("message not recognized!")
-//}
-//  def nextLineSlice() = {
-//    try {
-//      if (posSlice <= currentLine.length-1) {
-//        val head = currentLine(0)
-//        for (i<- 1 to Set(JUMP, currentLine.length-posSlice/JUMP2).min) {
-//          val currentSlice = currentLine.slice(posSlice, posSlice + JUMP2)
-//          sendTuple(StringSpoutGoing(cnt.toString + ' ' + head + "\t" + currentSlice.mkString("\t")))
-//          posSlice += JUMP2
-//        }
-//        AllocateSpoutTask(Duration(1, MILLISECONDS), "nextLineSlice")
-//      }
-//      else {
-//        posSlice = 1
-//        AllocateSpoutTask(Duration(1, NANOSECONDS), "nextLineBLock")
-//      }
-//    }catch {
-//      case e: Exception => println(e,  posSlice)
-//    }
-//  }
-//
-//  def nextLineBlock() = {
-//    try {
-//      cnt += 1
-//      cline = currentFile.readLine()
-//      currentLine = cline.split("\t")
-//      AllocateSpoutTask(Duration(1, NANOSECONDS), "nextLineSlice")
-//      }
-//    catch {
-//      case e:Exception => AllocateSpoutTask(Duration(1, NANOSECONDS), "nextFile")
-//    }
-//  }
-//
-//  def nextFile() = {
-//    directoryPosition += 1
-//    if (filesToRead.length > directoryPosition) {
-//      currentFile = fileToArray(directoryPosition)
-//      filename = filesToRead(directoryPosition) //D-200001_merge_occ
-//      time = filename.split('/').last.stripPrefix("D-").stripSuffix("_merge_occ").toLong * 1000000000L
-//      cnt = time + 1
-//      AllocateSpoutTask(Duration(1, NANOSECONDS), "nextLineBLock")
-//    }
-//    else {
-//      println("All files read "+ LocalDateTime.now())
-//    }
-//  }
-//
-//  def fileToArray(pos:Int) ={
-//    println(s"Now reading ${filesToRead(pos)}")
-//    if(dropHeader){
-//      val br = new BufferedReader(new FileReader(filesToRead(pos)))
-//      br.readLine()
-//      br
-//    }
-//    else
-//      new BufferedReader(new FileReader(filesToRead(pos)))
-//  }
-//
-//  def getListOfFiles(dir: String):Array[String] = {
-//    val d = new File(dir)
-//    if (d.exists && d.isDirectory) {
-//      d.listFiles.filter(f=> f.isFile && !f.isHidden).map(f=> f.getCanonicalPath).sorted
-//    } else {
-//      Array[String]()
-//    }
-//  }
-//
-//  override def startSpout(): Unit = self ! NextLineSlice
-//}
-//
-//object CooccurrenceMatrixSpout {
-//  object Message {
-//    sealed trait CooccuranceDomain extends DomainMessage
-//    case object NextLineSlice      extends CooccuranceDomain
-//    case object NextLineBlock extends CooccuranceDomain
-//    case object NextFile      extends CooccuranceDomain
-//  }
-//}
+package examples.wordSemantic.spouts
+
+import java.io._
+import java.util.zip.GZIPInputStream
+
+import com.raphtory.core.actors.Spout.Spout
+import com.typesafe.scalalogging.LazyLogging
+
+class CooccurrenceMatrixSpout extends Spout[String] {
+   val directory = System.getenv().getOrDefault("FILE_SPOUT_DIRECTORY", "/app").trim
+   val fileName = System.getenv().getOrDefault("FILE_SPOUT_FILENAME", "").trim 
+   val dropHeader = System.getenv().getOrDefault("FILE_SPOUT_DROP_HEADER", "false").trim.toBoolean
+
+   var fileManager = FileManager(directory, fileName, dropHeader)
+
+  override def generateData(): Option[String] = {
+    if (fileManager.allCompleted) {
+      dataSourceComplete()
+      None
+    }
+    else {
+      val (newFileManager, line) = fileManager.nextLine()
+      fileManager = newFileManager
+      Some(line)
+    }
+  }
+
+  override def setupDataSource(): Unit = {}
+
+  override def closeDataSource(): Unit = {}
+}
+ case class FileManager  (             currentFileReader: Option[BufferedReader],
+                                       restFiles: List[File],
+                                       dropHeader: Boolean,
+                                       timeInc: Long
+                                     ) extends LazyLogging {
+  def nextFile(): FileManager = this.copy(currentFileReader = None)
+
+  lazy val allCompleted: Boolean = currentFileReader.isEmpty && restFiles.isEmpty
+
+  def nextLine(): (FileManager, String) = currentFileReader match {
+    case None =>
+      restFiles match {
+        case Nil => (this, "")
+        case head :: tail =>
+          val reader             = getFileReader(head)
+          val (block, endOfFile) = readBlockAndIsEnd(reader)
+          val currentReader      = if (endOfFile) None else Some(reader)
+          val time = head.getName.split('/').last.stripPrefix("D-").stripSuffix("_merge_occ").toLong * 1000000000L
+          (this.copy(currentFileReader = currentReader, restFiles = tail,timeInc=time+1), (timeInc+1).toString +' '+ block)
+      }
+    case Some(reader) =>
+      val (block, endOfFile) = readBlockAndIsEnd(reader)
+      if (endOfFile) (this.copy(currentFileReader = None, timeInc=0L), block)
+      else (this.copy(timeInc=timeInc+1), timeInc.toString +' '+block)
+
+  }
+
+   def readBlockAndIsEnd(reader: BufferedReader): (String, Boolean) = {
+    val line = reader.readLine()
+    if (line != null)
+      (line,false)
+    else{
+      reader.close()
+      ("",true)
+    }
+  }
+
+   def getFileReader(file: File): BufferedReader = {
+    logger.info(s"Reading file ${file.getCanonicalPath}")
+
+    var br = new BufferedReader(new FileReader(file))
+    if (file.getName.endsWith(".gz")) {
+      val inStream = new FileInputStream(file)
+      val inGzipStream = new GZIPInputStream(inStream)
+      val inReader = new InputStreamReader(inGzipStream) //default to UTF-8
+      br = new BufferedReader(inReader)
+    }
+    if (dropHeader) {
+      br.readLine()
+    }
+    br
+  }
+}
+
+object FileManager extends LazyLogging {
+   val joiner     = System.getenv().getOrDefault("FILE_SPOUT_JOINER", "/").trim //gabNetwork500.csv
+  def apply(dir: String, fileName: String, dropHeader: Boolean): FileManager = {
+    val filesToRead =
+      if (fileName.isEmpty)
+        getListOfFiles(dir)
+      else {
+        val file = new File(dir + joiner + fileName)
+        if (file.exists && file.isFile)
+          List(file)
+        else {
+          logger.error(s"File $dir$joiner$fileName does not exist or is not file ")
+          List.empty
+        }
+      }
+    FileManager(None, filesToRead, dropHeader, 0L)
+  }
+
+   def getListOfFiles(dir: String): List[File] = {
+    val d = new File(dir)
+    if (d.exists && d.isDirectory) {
+      val files = getRecursiveListOfFiles(d)
+      files.filter(f => f.isFile && !f.isHidden)
+    }
+    else {
+      logger.error(s"Directory $dir does not exist or is not directory")
+      List.empty
+    }
+  }
+
+   def getRecursiveListOfFiles(dir: File): List[File] = {
+    val these = dir.listFiles.toList
+    these ++ these.filter(_.isDirectory).flatMap(getRecursiveListOfFiles)
+  }
+}
