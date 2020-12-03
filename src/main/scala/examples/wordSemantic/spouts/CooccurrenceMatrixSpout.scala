@@ -29,7 +29,7 @@ class CooccurrenceMatrixSpout extends Spout[String] {
 
   override def closeDataSource(): Unit = {}
 }
- case class FileManager  (             currentFileReader: Option[BufferedReader],
+ case class FileManager  ( currentFileReader: Option[BufferedReader],
                                        restFiles: List[File],
                                        dropHeader: Boolean,
                                        timeInc: Long

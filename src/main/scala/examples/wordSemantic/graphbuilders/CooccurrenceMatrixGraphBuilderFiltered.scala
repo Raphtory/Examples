@@ -10,9 +10,10 @@ class CooccurrenceMatrixGraphBuilderFiltered extends GraphBuilder[String] {
     //println(record)
     var dp =tuple.split(" ").map(_.trim)
     val occurenceTime = dp.head.toLong//DateFormatting(dp.head) //.slice(4, dp.head.length)
-    val scale = dp(1).toDouble
+
     try {
       dp = dp.last.split("\t")
+      val scale = scalling(dp.drop(2).grouped(2).map(_.head.toInt).toArray)
       val srcClusterId = assignID(dp.head)
       val len = dp.length
       sendUpdate(VertexAddWithProperties(msgTime = occurenceTime, srcID = srcClusterId, Properties(StringProperty("Word", dp.head))))
@@ -37,4 +38,7 @@ class CooccurrenceMatrixGraphBuilderFiltered extends GraphBuilder[String] {
       case e: Exception => println(e, dp.length, tuple.asInstanceOf[String])
     }
   }
+    def scalling(freq: Array[Int]): Double = {
+     math.sqrt(freq.map(math.pow(_, 2)).sum)
+    }
 }
