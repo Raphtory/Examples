@@ -2,6 +2,7 @@ package examples.lotr
 
 import com.raphtory.RaphtoryGraph
 import com.raphtory.algorithms.{ConnectedComponents, DegreeBasic}
+import com.raphtory.api.Analyser
 
 object LOTRDeployment extends App{
   val source  = new LOTRSpout()
