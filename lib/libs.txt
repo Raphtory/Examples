@@ -1,0 +1,1 @@
+ADD the [latest release](https://github.com/Raphtory/Raphtory/releases/tag/0.1) here!  
